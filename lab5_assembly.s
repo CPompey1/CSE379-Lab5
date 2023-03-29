@@ -73,10 +73,38 @@ main_print_data_loop:
 
 uart_interrupt_init:
 
-	; Your code to initialize the UART0 interrupt goes here
-	;enable UART0 6th bit
+	;Set the Receive Interrupt Mask (RXIM) bit in the UART Interrupt Mask Register (UARTIM)
+	;UART0 Base Address: 0x4000C000
+	;UARTIM offset: 0x038
+	;RXIM bit position: 4
 
-	;MUST SET END BIT IF Q IS TYPED
+	MOV r0, #0xC000
+	MOVT r0, #0x4000
+
+	MOV r1, #16		;bit 4 is 1
+
+	LDRB r2, [r0, #0x038]
+
+	ORR r2, r1, r2
+
+	STRB r2, [r0, #0x038]
+
+
+	;Configure Processor to Allow the UART to Interrupt Processor
+	;EN0 Base Address: 0xE000E000
+	;EN0 Offset: 0x100
+	;UART0 Bit Position: Bit 5
+
+	MOV r0, #0xE000
+	MOVT r0, #0xE000
+
+	MOV r1, #32				;bit 5 has 1
+
+	LDRB r2, [r0, #0x100]
+
+	ORR r2, r1, r2
+
+	STRB r2, [r0, #0x100]
 
 
 	MOV pc, lr
@@ -128,10 +156,41 @@ gpio_interrupt_init:
 
 UART0_Handler:
 
-	; Your code for your UART handler goes here.
 	; Remember to preserver registers r4-r11 by pushing then popping
 	; them to & from the stack at the beginning & end of the handler
+	PUSH {r4-r11}
 
+	;Clear Interrupt: Set the bit 4 (RXIC) in the UART Interrupt Clear Register (UARTICR)
+	;UART0 Base Address: 0x4000C000
+	;UARTICR Offset: 0x044
+	;UART0 Bit Position: Bit 4
+
+	MOV r0, #0xC000
+	MOVT r0, #0x4000
+
+	MOV r1, #16			;bit 4 has 1
+
+	LDRB r2, [r0, #0x044]
+
+	ORR r2, r1, r2
+
+	STRB r2, [r0, #0x044]
+
+
+	;increment key presses
+	ldr r0, ptr_to_mydata
+	LDRB r1, [r0]
+	ADD r1, r1, #1
+	STRB r1, [r0]
+
+	;lowercase q ascii: 113
+	;Carriage return: 13 -> moves cursor to the beggining of the current line
+	;Line Feed: 10  -> moves cursor down one line
+	;Form Feed: 12  -> clears the screen
+
+
+
+	POP{r4-r11}
 	BX lr       	; Return
 
 
