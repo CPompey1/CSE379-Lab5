@@ -141,21 +141,21 @@ gpio_interrupt_init:
 	MOV r0, #0x5404
 	MOVT r0, #0x4002
 	LDR r1, [r0]
-	ORR  r1,r1, #16
+	BIC  r1,r1, #16
 	STR r1,[r0]
 
 	;Enable interupt direction(s) gpioibe ;Consider removing this when debugging
 	MOV r0, #0x5408
 	MOVt r0, #0x4002
 	LDR r1, [r0]
-	ORR r1,r1,#16
+	BIC r1,r1,#16
 	STR r1,[r0]
 
 	;Enable rising edge interrupt GPIOIV
 	MOV r0, #0x540C
 	MOVt r0, #0x4002
 	LDR r1, [r0]
-	ORR r1,#16
+	BIC r1,#16
 	STR r1,[r0]
 
 	;Enable nterrupt GPIOIM
@@ -226,6 +226,7 @@ Switch_Handler:
 	; Remember to preserver registers r4-r11 by pushing then popping
 	; them to & from the stack at the beginning & end of the handler
 	PUSH {r4-r11}
+	PUSH {lr}
 
 	;clear interrupt register GPIOICR
 	MOV r0, #0x541C
@@ -243,6 +244,7 @@ Switch_Handler:
 
 
 
+	POP {lr}
 	POP {r4-r11}
 
 	BX lr       	; Return
