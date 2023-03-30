@@ -50,8 +50,11 @@ lab5:	; This is your main routine which is called from your C wrapper
 	ldr r4, ptr_to_prompt
 	ldr r5, ptr_to_mydata
 
-        bl uart_init
-	bl uart_interrupt_init
+    bl uart_init
+    bl tiva_pushbtn_init
+    bl gpio_interrupt_init
+
+
 	bl uart_interrupt_init
 
 	; This is where you should implement a loop, waiting for the user to
@@ -116,6 +119,8 @@ gpio_interrupt_init:
 	; Don't forget to follow the procedure you followed in Lab #4
 	; to initialize SW1.
 
+	bl gpio_btn_and_LED_init
+
 	;enable interrupt sense register GPIOS
 	MOV r0, #0x5404
 	MOVT r0, #0x4002
@@ -124,11 +129,11 @@ gpio_interrupt_init:
 	STR r1,[r0]
 
 	;Enable interupt direction(s) ;Consider removing this when debugging
-	MOV r0, #0x5408
-	MOVt r0, #0x4002
-	LDR r1, [r0]
-	ORR r1,r1,#16
-	STR r1,[r0]
+	;MOV r0, #0x5408
+	;MOVt r0, #0x4002
+	;LDR r1, [r0]
+	;ORR r1,r1,#16
+	;STR r1,[r0]
 
 	;Enable rising edge interrupt
 	MOV r0, #0x540C
@@ -143,6 +148,8 @@ gpio_interrupt_init:
 	LDR r1, [r0]
 	ORR r1,r1,#16
 	STR r1,[r0]
+
+
 
 	;Convfigure Procesor to Allow GPIO Port F to interrupt processor
 	MOV r0, #0xE100
@@ -384,6 +391,64 @@ uart_init:
 	MOV PC, LR
 
 ;****************************************************************HELPER SUBROUTINES************************************************************************
+;*****************************************************************************************************
+gpio_btn_and_LED_init:
+;initializes the four push buttons on the Alice EduBase board, the four LEDs on the AliceEduBase board,
+;the momentary push button on the Tiva board (SW1), and the RGB LED on the Tiva board. It should NOT
+;initialize the keypad.  That code is provided for you and can be downloaded from the course website.
+
+
+;PushButtons: Port D, pins 0-3 (buttons 2 to 5)
+;LEDs: Port B, pins 0-3
+	PUSH {lr} ; Store register lr on stack
+
+	;enabling clock for port B and D
+	;clock control register base address: 0x400FE608
+	MOV r0, #0xE608
+	MOVT r0, #0x400F
+
+	LDRB r1, [r0]
+	MOV r2, #0xA
+	ORR r1, r1, r2		;port B is pin 1 and port D is pin 3
+	STRB r1, [r0]
+
+
+	;initialize LEDs
+	MOV r0, #0x5000
+	MOVT r0, #0x4000	;base adddress of port B is 0x40005000
+
+	LDRB r1, [r0, #0x400]
+	ORR r1, r1, #0xF	;direction of pins 0-3 should be 1 for output
+	STRB r1, [r0, #0x400] ;offset of data direction register is 0x400
+
+	LDRB r1, [r0, #0x51C]
+	ORR r1, r1, #0xF
+	STRB r1, [r0, #0x51C] ;configuring pins 0-3 to be digital (digital register offset is 0x51C)
+
+	LDRB r1, [r0, #0x510]
+	ORR r1, r1, #0xF
+	STRB r1, [r0, #0x510]	;configuring pullup resistor (pullup register offset is 0x510)
+
+	;initialize PushButtons
+	MOV r0, #0x7000
+	MOVT r0, #0x4000		;Base adddress for port D is 0x40007000
+
+	LDRB r1, [r0, #0x400]
+	MVN r3, #0xF			;direction of pins 0-3 must be 0 for input
+	AND r1, r1, r3
+	STRB r1, [r0, #0x400]	;configuring pins 0-3 to be input
+
+	LDRB r1, [r0, #0x51C]
+	ORR r1, r1, #0xF		;writing 1 to pins for enable digital and pullup resistor
+	STRB r1, [r0, #0x51C]	;configuring pins 0-3 to be digital (digital register offset is 0x51C)
+
+	LDRB r1, [r0, #0x510]
+	ORR r1, r1, #0xF
+	STRB r1, [r0, #0x510]	;configuring pullup resistor (pullup register offset is 0x510)
+
+	POP {lr}
+	MOV pc, lr
+
 int2string:
 	PUSH {lr}   ; Store register lr on stack
 
@@ -524,6 +589,65 @@ donePow1: 				;Pow exit
 	POP {r2}
 	POP {lr}
 	MOV pc,lr
+
+tiva_pushbtn_init:
+	PUSH {lr}
+	;enabling clock for port F
+	;SYSCTL_RCGC_GPIO address: 0x400FE608
+	MOV r1, #0xE608
+	MOVT r1, #0x400F
+	;port F is pin 5
+	LDRB r2, [r1]
+	ORR r2, r2, #0x20	; pin 5 must be 1 to enable clock
+	STRB r2, [r1]
+
+
+	;Setting pin 4 as Input (as it is reading data from the board)
+	; Port F base address: 0x40025000
+	MOV r1, #0x5000
+	MOVT r1, #0x4002
+	;data direction register adress offset: 0x400
+	;push button SW1 is pin 4
+	LDRB r2, [r1, #0x400]
+	MVN r3, #0x10
+	AND r2, r2, r3		;pin 4 must be 0 to be INPUT
+	STRB r2, [r1, #0x400]
+
+	;Setting pin 4 as digital
+	;Digital enable Register offset: 0x51C
+	LDRB r2, [r1, #0x51C]
+	ORR r2, r2, #0x10	;pin 4 must be 1 to enable digital
+	STRB r2, [r1, #0x51C]
+
+	;Configuring pullup resistor
+	;offset: 0x510
+	LDRB r2, [r1, #0x510]
+	ORR r2, r2, #0x10	;pin 4 must be 1 to enable pullup resistor
+	STRB r2, [r1, #0x510]
+	POP {lr}
+
+
+read_tiva_pushbutton:
+	;read_from_push_btn reads from the momentary push button (SW1) on the Tiva board
+;returns a one (1) in r0 if the button is currently being pressed and a zero (0) if it is not.
+
+;push button SW1: PORT F PIN 4
+;Port F base address: 0x40025000
+
+	PUSH {lr}
+	MOV r1, #0x5000
+	MOVT r1, #0x4002
+	LDRB r2, [r1, #0x3FC]
+	AND r2, r2, #0x10	;masking pin 4 data
+	MOV r0, #0			; r0 is 0 for now...
+	CMP r2, #0x10		;checking if pin 4 reads 1
+	BEQ read_tiva_pushbutton_end		; if it is, it can just end because r0 was set to 0
+	MOV r0, #1			; if it is not, return 1 in r0
+
+read_tiva_pushbutton_end:
+
+	POP {lr}
+	MOV pc, lr
 ;****************************************************************END HELPER SUBROUTINES************************************************************************
 
 
