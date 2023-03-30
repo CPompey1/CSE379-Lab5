@@ -43,20 +43,36 @@ ptr_to_num_2_string:	.word num_2_string
 
 ;***************Data packet orginization*******************************
 ;	|SwitchPresses	|KeyPresses	|End Flag	|Nothing|
-;	0				8			16			24		32
+;	0		8		16		24	32
 ;**********************************************************************
 lab5:	; This is your main routine which is called from your C wrapper
 	PUSH {lr}   		; Store lr to stack
 	ldr r4, ptr_to_prompt
 	ldr r5, ptr_to_mydata
 
-    bl uart_init
-    bl tiva_pushbtn_init
-    bl gpio_interrupt_init
+	bl uart_init
+	bl tiva_pushbtn_init
+
+	bl gpio_interrupt_init
+	;bl uart_interrupt_init
 
 
-	bl uart_interrupt_init
-
+	;NOOPS
+	MOV r0,r0
+	MOV r0,r0
+	MOV r0,r0
+	MOV r0,r0
+	MOV r0,r0
+	MOV r0,r0
+	MOV r0,r0
+	MOV r0,r0
+	MOV r0,r0
+	MOV r0,r0
+	MOV r0,r0
+	MOV r0,r0
+	MOV r0,r0
+	MOV r0,r0
+	MOV r0,r0
 	; This is where you should implement a loop, waiting for the user to
 	; enter a q, indicating they want to end the program.
 
@@ -114,32 +130,32 @@ uart_interrupt_init:
 
 
 gpio_interrupt_init:
-
+	PUSH {lr}
 	; Your code to initialize the SW1 interrupt goes here
 	; Don't forget to follow the procedure you followed in Lab #4
 	; to initialize SW1.
 
 	bl gpio_btn_and_LED_init
 
-	;enable interrupt sense register GPIOS
+	;enable interrupt sensitivitye register GPIOIS
 	MOV r0, #0x5404
 	MOVT r0, #0x4002
 	LDR r1, [r0]
-	ORR r1,r1, #16
+	ORR  r1,r1, #16
 	STR r1,[r0]
 
-	;Enable interupt direction(s) ;Consider removing this when debugging
-	;MOV r0, #0x5408
-	;MOVt r0, #0x4002
-	;LDR r1, [r0]
-	;ORR r1,r1,#16
-	;STR r1,[r0]
-
-	;Enable rising edge interrupt
-	MOV r0, #0x540C
+	;Enable interupt direction(s) gpioibe ;Consider removing this when debugging
+	MOV r0, #0x5408
 	MOVt r0, #0x4002
 	LDR r1, [r0]
 	ORR r1,r1,#16
+	STR r1,[r0]
+
+	;Enable rising edge interrupt GPIOIV
+	MOV r0, #0x540C
+	MOVt r0, #0x4002
+	LDR r1, [r0]
+	ORR r1,#16
 	STR r1,[r0]
 
 	;Enable nterrupt GPIOIM
@@ -155,9 +171,12 @@ gpio_interrupt_init:
 	MOV r0, #0xE100
 	MOVt r0, #0xE000
 	LDR r1, [r0]
-	ORR r1,r1, #1073741824 ;lol 2^30
+	MOV r2, #1
+	LSL r2, r2, #30
+	ORR r1,r1, r2 ;lol 2^30
 	STR r1,[r0]
 
+	POP {lr}
 	MOV pc, lr
 
 
@@ -212,7 +231,7 @@ Switch_Handler:
 	MOV r0, #0x541C
 	MOVT r0, #0x4002
 	LDR r1,[r0]
-	ORR r1, r1,#16
+	bic r1, r1,#16
 	STR r1, [r0]
 
 	;Incrament switch presses
