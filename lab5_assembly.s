@@ -179,13 +179,12 @@ UART0_Handler:
 	MOV r0, #0xC000
 	MOVT r0, #0x4000
 
-	MOV r1, #16			;bit 4 has 1
 
-	LDRB r2, [r0, #0x044]
+	LDR r2, [r0, #0x044]
 
-	ORR r2, r1, r2
+	BIC r2, r2, #16		;bit 4 has 1
 
-	STRB r2, [r0, #0x044]
+	STR r2, [r0, #0x044]
 
 
 	;increment key presses
@@ -203,6 +202,7 @@ UART0_Handler:
 
 	POP{r4-r11}
 	BX lr       	; Return
+
 
 
 Switch_Handler:
