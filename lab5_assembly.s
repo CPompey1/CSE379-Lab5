@@ -7,9 +7,8 @@
 	.global num_1_string
 	.global num_2_string
 
-
-prompt:	.string "Your prompt with instructions is place here", 0
-mydata:	.byte	0x20	; This is where you can store data.
+prompt:	.string "Press SW1 or a key (q to quit)", 0
+mydata:	.word	0	; This is where you can store data.
 			; The .byte assembler directive stores a byte
 			; (initialized to 0x20) at the label mydata.
 			; Halfwords & Words can be stored using the
@@ -52,7 +51,7 @@ lab5:	; This is your main routine which is called from your C wrapper
 
 	bl uart_init
 	bl tiva_pushbtn_init
-
+	bl gpio_btn_and_LED_init
 	bl gpio_interrupt_init
 	bl uart_interrupt_init
 
@@ -66,17 +65,17 @@ lab5:	; This is your main routine which is called from your C wrapper
 
 main_print_data_loop:
 	bl print_data
-	LDRB r0,[r4,#16]
+	LDRB r0, [r5,#3]
 	cmp r0, #1
 	bne main_print_data_loop
 
-	POP {lr}		; Restore lr from the stack
+	;POP {lr}		; Restore lr from the stack
 	MOV pc, lr
 
 
 
 uart_interrupt_init:
-
+	PUSH {lr}
 	;Set the Receive Interrupt Mask (RXIM) bit in the UART Interrupt Mask Register (UARTIM)
 	;UART0 Base Address: 0x4000C000
 	;UARTIM offset: 0x038
@@ -110,7 +109,7 @@ uart_interrupt_init:
 
 	STRB r2, [r0, #0x100]
 
-
+	POP {lr}
 	MOV pc, lr
 
 
@@ -120,7 +119,7 @@ gpio_interrupt_init:
 	; Don't forget to follow the procedure you followed in Lab #4
 	; to initialize SW1.
 
-	bl gpio_btn_and_LED_init
+
 
 	;enable interrupt sensitivitye register GPIOIS
 	MOV r0, #0x5404
@@ -167,6 +166,7 @@ gpio_interrupt_init:
 
 UART0_Handler:
 
+	PUSH {lr}
 	; Remember to preserver registers r4-r11 by pushing then popping
 	; them to & from the stack at the beginning & end of the handler
 	PUSH {r4-r11}
@@ -202,6 +202,7 @@ UART0_Handler:
 
 
 	POP{r4-r11}
+	POP {LR}
 	BX lr       	; Return
 
 
@@ -210,28 +211,25 @@ Switch_Handler:
 	; Your code for your UART handler goes here.
 	; Remember to preserver registers r4-r11 by pushing then popping
 	; them to & from the stack at the beginning & end of the handler
-	PUSH {r4-r11}
 	PUSH {lr}
+	PUSH {r4-r11}
+
 
 	;clear interrupt register GPIOICR
 	MOV r0, #0x541C
 	MOVT r0, #0x4002
 	LDR r1,[r0]
-	bic r1, r1,#16
+	ORR r1, r1,#16
 	STR r1, [r0]
 
-	;Incrament switch presses
+	;Incrament switch pressesS
 	ldr r0,ptr_to_mydata
 	LDRB r1,[r0];Modify first byte
 	ADD r1, r1,#1
 	STRB r1,[r0]
 
-
-
-
-	POP {lr}
 	POP {r4-r11}
-
+	POP {lr}
 	BX lr       	; Return
 
 
@@ -252,65 +250,35 @@ Timer_Handler:
 ;	-prints data loaded in data word block as well as a bar graph
 ;	- uses no unpreserved registers
 print_data:
-	;load switch presses
-	ldr r0, ptr_to_mydata
-	LDRB r1, [r0]
-
+	PUSH{lr}
 	;Print switch presses
-	PUSH {r0,r1}
 	ldr r0, ptr_to_switch_presses_str
 	bl output_string
-	POP {r0,r1}
-	PUSH {r0,r1}
-	MOV r0,r1
+	LDR r0, ptr_to_mydata
+	LDRB r0, [r0]
 	ldr r1, ptr_to_num_1_string
 	bl int2string
 	MOV r0,r1
 	bl output_string
-	POP {r0,r1}
 
-	;Print newline
-
-	PUSH {r0,r1,r2}
-	MOV r0, #0x0A
-	bl output_character
-	PUSH {r0,r1,r2}
-
-	;print carriage return
-	PUSH {r0,r1,r2}
-	MOV r0, #0x0d
-	bl output_character
-	PUSH {r0,r1,r2}
 
 	;load key presses
 	ldr r0, ptr_to_mydata
-	LDRB r1, [r0,#8]
+	LDRB r1, [r0,#1]
 
 	;Print key presses
-	PUSH {r0,r1}
 	ldr r0, ptr_to_key_presses_str
 	bl output_string
-	POP {r0,r1}
-	PUSH {r0,r1}
-	MOV r0,r1
+	ldr r0, ptr_to_mydata
+	ldrb r0, [r0,#1]
 	ldr r1,ptr_to_num_2_string
 	bl int2string
 	MOV r0,r1
 	bl output_string
-	POP {r0,r1}
 
 	;Print newline
-
-	PUSH {r0,r1,r2}
 	MOV r0, #0x0A
 	bl output_character
-	PUSH {r0,r1,r2}
-
-	;print carriage return
-	PUSH {r0,r1,r2}
-	MOV r0, #0x0d
-	bl output_character
-	PUSH {r0,r1,r2}
 
 
 
@@ -319,6 +287,11 @@ print_data:
 	;load switch presses
 	ldr r0, ptr_to_mydata
 	LDRB r1, [r0]
+
+	;Check if zero
+	cmp r1,#0
+	beq print_key_press_graph
+
 	;For all switchpresses print x's
 print_switch_presses_loop:
 	PUSH {r0,r1,r2}
@@ -330,21 +303,25 @@ print_switch_presses_loop:
 	BNE print_switch_presses_loop
 
 	;Print newline
-
 	PUSH {r0,r1,r2}
 	MOV r0, #0x0A
 	bl output_character
-	PUSH {r0,r1,r2}
+	POP {r0,r1,r2}
 
 	;print carriage return
 	PUSH {r0,r1,r2}
 	MOV r0, #0x0d
 	bl output_character
-	PUSH {r0,r1,r2}
+	POP {r0,r1,r2}
 
+print_key_press_graph:
 	;Load key presses
 	ldr r0, ptr_to_mydata
-	LDRB r1, [r0,#8]
+	LDRB r1, [r0,#1]
+
+	;Check if zero
+	cmp r1,#0
+	beq finish_print_data
 
 	;For all keypresses print x's
 print_key_presses_loop:
@@ -360,18 +337,16 @@ print_key_presses_loop:
 	PUSH {r0,r1,r2}
 	MOV r0, #0x0A
 	bl output_character
-	PUSH {r0,r1,r2}
+	POP {r0,r1,r2}
 
 	;print carriage return
 	PUSH {r0,r1,r2}
 	MOV r0, #0x0d
 	bl output_character
-	PUSH {r0,r1,r2}
+	POP {r0,r1,r2}
+finish_print_data:
 
-
-
-
-
+	POP {LR}
 	MOV PC,LR
 ;************************************************************************END PRINT DATA************************************************************************
 simple_read_character:
@@ -633,8 +608,20 @@ gpio_btn_and_LED_init:
 	POP {lr}
 	MOV pc, lr
 
+;Your code for your int2string routine is placed here
+;Inputs: r0 - Integer to store as a string
+;		 r1 - Address to store 32-byte
+;
+;Used Registers:
 int2string:
 	PUSH {lr}   ; Store register lr on stack
+	PUSH {r4}
+
+	;Store copy of base address
+	MOV r4,r1
+
+	CMP r0, #0
+	beq int_is_zero
 
 	;Push r0 and r1 before the call to integer_digits
 	PUSH {r0,r1}
@@ -648,6 +635,57 @@ int2string:
 
 	;Pop old r0 & r1 from stack
 	POP {r0,r1}
+
+
+int2StringLoop1:
+	;Push r0,r1,r2 prior to calling nth digit
+	PUSH {r0,r1,r2}
+
+	;MOV r2(nth digit to find) to r1
+	MOV r1,r2
+
+	;r0(nth place digit),r1(num digits) = integerDigit(r0(dec),r1(n))
+	BL integer_digit
+
+
+	;Store result + AsciiHexOffset in r3
+	ADD r3,r1,#48
+
+	;Pop r0,r1,r2 POST integerDigit call
+	POP {r0,r1,r2}
+
+	;Store lower byte of r3 into memory pointed to by r1
+	STRB r3, [r1]
+
+	;Incrament mem address r1
+	ADD r1,r1,#0x1
+
+	;Decrament nth place r2
+	SUB r2,r2,#0x1
+
+	;Branch to int2StringLoop1 if r2 < 0  (or ==-1)
+	CMP r2,#-1
+	BNE int2StringLoop1
+	;Else
+	b store_null
+
+int_is_zero:
+	MOV r2, #48
+	STRB r2, [r1]
+	ADD r1, r1,#1
+
+
+store_null:
+	;Store NULL and then exit EXIT
+	MOV r0,#0
+	STRB r0,[r1]
+
+	;Reset to base address
+	MOV r1,r4
+
+	POP {r4}
+	POP {lr}
+	mov pc, lr
 
 ;Integer_digit
 ;Inputs: r0	- Decimal value
@@ -728,9 +766,7 @@ nthPlaceLoop:
 	SUB r0, r0, #1
 	push {r0,r1}
 	MOV r1, #10
-	push {LR}
 	BL MOD
-	pop {lr}
 	MOV r2, r0
 	POP {r0,r1}
 	CMP r2, #0
@@ -809,6 +845,7 @@ tiva_pushbtn_init:
 	ORR r2, r2, #0x10	;pin 4 must be 1 to enable pullup resistor
 	STRB r2, [r1, #0x510]
 	POP {lr}
+	MOV pc,lr
 
 
 read_tiva_pushbutton:
