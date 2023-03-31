@@ -394,9 +394,43 @@ simple_read_character:
 	MOV PC,LR      	; Return
 
 
-output_character:
+output_string:
+;transmits a NULL-terminated ASCII string for display in PuTTy.
+;The base address of the string should be passed into the routine in r0.
 
-	MOV PC,LR      	; Return
+	PUSH {lr}   ; Store register lr on stack
+	PUSH {r4}	; pushing r4 to make a copy of base address (currently in r0)
+
+	MOV r4, r0	;making copy of base address in r4
+	MOV r2, #0
+Outputting:
+	LDRB r0, [r4]		; loading the character from the base address in r4
+	BL output_character	;call output_character
+	ADD r4, r4, #1;		increment r4's address by 1
+
+	LDRB r1, [r4]
+	CMP r1, r2			;checking if data in r4 is NULL
+	BNE Outputting		; if it is not, go back
+
+	;Print newline
+	;push registers
+	PUSH {r0,r1}
+	MOV r0, #10
+	;r0 = outputChar
+	bl output_character
+	POP {r0,r1}
+
+	;Print carriage return
+	;push registers
+	PUSH {r0,r1}
+	MOV r0, #13
+	;r0 = outputChar
+	bl output_character
+	POP {r0,r1}
+
+	POP{r4}
+	POP {lr}
+	mov pc, lr
 
 
 read_string:
@@ -404,12 +438,155 @@ read_string:
 	MOV PC,LR      	; Return
 
 
-output_string:
+; Your code for your output_character routine is placed here
+output_character:
+; transmits a character from the UART to PuTTy.  The character is passed in r0
 
-	MOV PC,LR      	; Return
+	PUSH {lr}   ; Store register lr on stack
+	PUSH {r4}
+	; Your code to output a character to be displayed in PuTTy
+	; is placed here.  The character to be displayed is passed
+	; into the routine in r0.
+	MOV r1, #0xC000
+	MOVT r1, #0x4000; r1 has UARTFR Address
+	MOV r4, #32
 
+TestFlag:
+	LDRB r3, [r1, #U0FR]		;r3 has the UARTFR data byte
+	AND r3, r3, #32		;Masking r3 to only have the TxFF bit
+	CMP r3, r4
+	BEQ TestFlag		;testing if bit 5 is 1, if it is, go back to TestFlag
+
+	MOV r1, #0xC000		; r1 has the UARTDR address
+	MOVT r1, #0x4000
+	STRB r0, [r1]		; store r0 into UARTDR data segment
+
+	POP {r4}
+	POP {lr}
+
+	mov pc, lr
+
+; Your code for your uart_init routine is placed here
+;Inputs:
+;Outputs:
 uart_init:
-	MOV PC, LR
+	PUSH {lr}  ; Store register lr on stack
+
+	;(*((volatile uint32_t *)(0x400FE618))) = 1;
+	MOV r0,#0xE618
+	MOVT r0,#0x400F
+	MOV r1,#0x1
+	STRB r1, [r0]
+	;/* Enable clock to PortA  */
+	;(*((volatile uint32_t *)(0x400FE608))) = 1;
+	MOV r0,#0xE608
+	MOVT r0,#0x400F
+	MOV r1,#1
+	STRB r1, [r0]
+
+	;/* Disable UART0 Control  */
+	;(*((volatile uint32_t *)(0x4000C030))) = 0;
+	MOV r0, #0xC030
+	MOVT r0, #0x4000
+	MOV r1, #0
+	STRB r1, [r0]
+
+	;/* Set UART0_IBRD_R for 115,200 baud */
+	;(*((volatile uint32_t *)(0x4000C024))) = 8;
+	MOV r0, #0xC024
+	MOVT r0, #0x4000
+	MOV r1,#8
+	STRB r0,[r1]
+
+	;/* Set UART0_FBRD_R for 115,200 baud */
+	;(*((volatile uint32_t *)(0x4000C028))) = 44;
+	MOV r0,#0xC028
+	MOVT r0,#0x4000
+	MOV r1,#44
+	STRB r0,[r1]
+
+	;/* Use System Clock */
+	;(*((volatile uint32_t *)(0x4000CFC8))) = 0;
+	MOV r0,#0xCFC8
+	MOVT r0,#0x4000
+	MOV r1,#0
+	STRB r0,[r1]
+
+	;/* Use 8-bit word length, 1 stop bit, no parity */
+	;(*((volatile uint32_t *)(0x4000C02C))) = 0x60;
+	MOV r0, #0xC02C
+	MOVT r0, #0x4000
+	MOV r1,#0x70
+	STRB r0,[r1]
+
+	;/* Enable UART0 Control  */
+	;(*((volatile uint32_t *)(0x4000C030))) = 0x301;
+	MOV r0,#0xC030
+	MOVT r0,#0x4000
+	MOV r1, #0x301
+	STR r1,[r0]
+
+
+    ;/*************************************************/
+	;/* The OR operation sets the bits that are OR'ed */
+	;/* with a 1.  To translate the following lines   */
+	; to assembly, load the data, OR the data with  */
+	;/* the mask and store the result back.           */
+    ;/*************************************************/
+
+	;/* Make PA0 and PA1 as Digital Ports  */
+	;(*((volatile uint32_t *)(0x4000451C))) |= 0x03;
+	MOV r1, #0x03
+	MOV r0, #0x451C
+	MOVT r0, #0x4000
+
+	;Temp = *(volatile uint32_t *)(0x4000451C)
+	ldr r2, [r0]
+
+	;Temp = Temp | 0x03
+	ORR r2, r2,r1
+
+	;*(volatile uint32_t *)(0x4000451C) = Temp = (volatile uint32_t *)(0x4000451C) |  0x03
+ 	STR r2, [r0]
+
+
+	;/* Change PA0,PA1 to Use an Alternate Function  */
+	;(*((volatile uint32_t *)(0x40004420))) |= 0x03;
+	MOV r1, #0x03
+	MOV r0, #0x4420
+	MOVT r0, #0x4000
+
+	;Temp = *(volatile uint32_t *)(0x40004420)
+	ldr r2, [r0]
+
+	;Temp = Temp | 0x03
+	ORR r2, r2,r1
+
+	;*(volatile uint32_t *)(0x40004420) = Temp = (volatile uint32_t *)(0x40004420) |  0x03
+ 	STR r2, [r0]
+
+
+	;/* Configure PA0 and PA1 for UART  */
+	;(*((volatile uint32_t *)(0x4000452C))) |= 0x11; c
+	MOV r1, #0x11
+	MOV r0, #0x452c
+	MOVT r0, #0x4000
+
+	;Temp = *(volatile uint32_t *)(0x4000452C)
+	ldr r2, [r0]
+
+	;Temp = Temp | 0x11
+	ORR r2, r2,r1
+
+	;*(volatile uint32_t *)(0x4000452C) = Temp = (volatile uint32_t *)(0x4000452C) |  0x11
+ 	STR r2, [r0]
+
+
+
+	;Print instructions to the screen
+	;no
+	POP {lr}
+	mov pc, lr
 
 ;****************************************************************HELPER SUBROUTINES************************************************************************
 ;*****************************************************************************************************
