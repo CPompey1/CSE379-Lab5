@@ -54,29 +54,14 @@ lab5:	; This is your main routine which is called from your C wrapper
 	bl tiva_pushbtn_init
 
 	bl gpio_interrupt_init
-	;bl uart_interrupt_init
+	bl uart_interrupt_init
 
 
-	;NOOPS
-	MOV r0,r0
-	MOV r0,r0
-	MOV r0,r0
-	MOV r0,r0
-	MOV r0,r0
-	MOV r0,r0
-	MOV r0,r0
-	MOV r0,r0
-	MOV r0,r0
-	MOV r0,r0
-	MOV r0,r0
-	MOV r0,r0
-	MOV r0,r0
-	MOV r0,r0
-	MOV r0,r0
+
 	; This is where you should implement a loop, waiting for the user to
 	; enter a q, indicating they want to end the program.
 
-	MOV r0,r5
+	MOV r0,r4
 	bl output_string
 
 main_print_data_loop:
@@ -452,7 +437,7 @@ output_character:
 	MOV r4, #32
 
 TestFlag:
-	LDRB r3, [r1, #U0FR]		;r3 has the UARTFR data byte
+	LDRB r3, [r1, #0x18]		;r3 has the UARTFR data byte
 	AND r3, r3, #32		;Masking r3 to only have the TxFF bit
 	CMP r3, r4
 	BEQ TestFlag		;testing if bit 5 is 1, if it is, go back to TestFlag
@@ -475,49 +460,50 @@ uart_init:
 	;(*((volatile uint32_t *)(0x400FE618))) = 1;
 	MOV r0,#0xE618
 	MOVT r0,#0x400F
-	MOV r1,#0x1
-	STRB r1, [r0]
+	MOV r1,#1
+	STR r1, [r0]
+
 	;/* Enable clock to PortA  */
 	;(*((volatile uint32_t *)(0x400FE608))) = 1;
 	MOV r0,#0xE608
 	MOVT r0,#0x400F
 	MOV r1,#1
-	STRB r1, [r0]
+	STR r1, [r0]
 
 	;/* Disable UART0 Control  */
-	;(*((volatile uint32_t *)(0x4000C030))) = 0;
+	;(*((volatile uint32_t *)(0x4000C030))) = 8;
 	MOV r0, #0xC030
 	MOVT r0, #0x4000
-	MOV r1, #0
-	STRB r1, [r0]
+	MOV r1, #8
+	STR r1, [r0]
 
 	;/* Set UART0_IBRD_R for 115,200 baud */
 	;(*((volatile uint32_t *)(0x4000C024))) = 8;
 	MOV r0, #0xC024
 	MOVT r0, #0x4000
 	MOV r1,#8
-	STRB r0,[r1]
+	STR r1,[r0]
 
 	;/* Set UART0_FBRD_R for 115,200 baud */
 	;(*((volatile uint32_t *)(0x4000C028))) = 44;
 	MOV r0,#0xC028
 	MOVT r0,#0x4000
 	MOV r1,#44
-	STRB r0,[r1]
+	STR r1,[r0]
 
 	;/* Use System Clock */
 	;(*((volatile uint32_t *)(0x4000CFC8))) = 0;
 	MOV r0,#0xCFC8
 	MOVT r0,#0x4000
 	MOV r1,#0
-	STRB r0,[r1]
+	STR r1,[r0]
 
 	;/* Use 8-bit word length, 1 stop bit, no parity */
 	;(*((volatile uint32_t *)(0x4000C02C))) = 0x60;
 	MOV r0, #0xC02C
 	MOVT r0, #0x4000
-	MOV r1,#0x70
-	STRB r0,[r1]
+	MOV r1,#0x60
+	STR r1,[r0]
 
 	;/* Enable UART0 Control  */
 	;(*((volatile uint32_t *)(0x4000C030))) = 0x301;
