@@ -180,19 +180,21 @@ UART0_Handler:
 	MOVT r0, #0x4000
 
 
-	LDR r2, [r0, #0x044]
+	LDR r2, [r0, #0x44]
 
-	BIC r2, r2, #16		;bit 4 has 1
+	ORR r2, r2, #16		;bit 4 has 1
 
-	STR r2, [r0, #0x044]
+	STR r2, [r0, #0x44]			;this is not storing properly(?)
 
 
 	;increment key presses
 	ldr r0, ptr_to_mydata
-	LDRB r1, [r0]
+	LDRB r1, [r0, #1]		;is loading thr same address of switch presses
 	ADD r1, r1, #1
-	STRB r1, [r0]
+	STRB r1, [r0, #1]
 
+
+	BL simple_read_character
 	;lowercase q ascii: 113
 	;Carriage return: 13 -> moves cursor to the beggining of the current line
 	;Line Feed: 10  -> moves cursor down one line
@@ -351,6 +353,15 @@ finish_print_data:
 ;************************************************************************END PRINT DATA************************************************************************
 simple_read_character:
 
+	PUSH{lr}
+	;Load UARTDR base register
+	MOV r1, #0xC000
+	MOVT r1, #0x4000
+
+	;Load lower byte from UARTDR into r0
+	LDRB r0, [r1]
+
+	POP{lr}
 	MOV PC,LR      	; Return
 
 
