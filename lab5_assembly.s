@@ -182,7 +182,7 @@ UART0_Handler:
 
 	LDR r2, [r0, #0x044]
 
-	ORR r2, r2, #16		;bit 4 has 1
+	BIC r2, r2, #16		;bit 4 has 1
 
 	STR r2, [r0, #0x044]
 
@@ -423,6 +423,7 @@ TestFlag:
 
 	POP {r4}
 	POP {lr}
+
 	mov pc, lr
 
 ; Your code for your uart_init routine is placed here
